@@ -142,8 +142,10 @@ namespace AnimalFoodPreference
             ls.Gap(Margin);
 
             ls.Label("Max Search Distance — cells; 0 = whole map. Limits search set for better performance.");
-            ls.IntEntry(ref settings.maxSearchDistance, ref maxSearchDistanceBuffer, 0, 9999);
-            if (settings.maxSearchDistance < 0) settings.maxSearchDistance = 0;
+            Rect maxDistRow = ls.GetRect(RowHeight);
+            maxSearchDistanceBuffer = Widgets.TextField(maxDistRow.LeftPartPixels(120f), maxSearchDistanceBuffer);
+            if (int.TryParse(maxSearchDistanceBuffer, out int parsedMaxDist))
+                settings.maxSearchDistance = Mathf.Max(0, parsedMaxDist);
             ls.Gap(Margin);
 
             if (ls.ButtonText("Reset to Defaults", widthPct: 0.22f))
