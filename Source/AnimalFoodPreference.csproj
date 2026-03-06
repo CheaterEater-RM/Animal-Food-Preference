@@ -1,0 +1,75 @@
+<!--
+  Animal Food Preference — .csproj (SDK-style, net48)
+  ====================================================
+  
+  SETUP:
+  1. Ensure RimWorld.Paths.props exists two directories above Source\
+     (at the Rimworld Mods\ root folder, outside any repo)
+  2. Build: open AnimalFoodPreference.sln in Visual Studio, Ctrl+Shift+B
+  
+  PRIVACY: This csproj contains NO absolute paths and NO personal info.
+  All machine-specific paths come from the imported .props file.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ================================================================ -->
+  <!-- Import machine-specific game paths (lives outside this repo)     -->
+  <!-- ================================================================ -->
+  <Import Project="..\..\RimWorld.Paths.props" />
+
+  <!-- ================================================================ -->
+  <!-- Project configuration                                            -->
+  <!-- ================================================================ -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>AnimalFoodPreference</RootNamespace>
+    <AssemblyName>AnimalFoodPreference</AssemblyName>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Description>Guides animal food selection to prefer renewable sources first</Description>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>..\1.6\Assemblies\</OutputPath>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <!-- ================================================================ -->
+  <!-- CORE REFERENCES                                                  -->
+  <!-- ================================================================ -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(RimWorldManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(RimWorldManaged)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- ================================================================ -->
+  <!-- HARMONY                                                          -->
+  <!-- ================================================================ -->
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(HarmonyAssemblies)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- ================================================================ -->
+  <!-- UNITY MODULES — settings UI needs IMGUI + TextRendering          -->
+  <!-- ================================================================ -->
+  <ItemGroup>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(RimWorldManaged)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(RimWorldManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
