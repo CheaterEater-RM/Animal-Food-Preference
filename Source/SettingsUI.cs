@@ -120,9 +120,10 @@ namespace AnimalFoodPreference
 
             ls.Label("Tier Spacing — points between adjacent tiers. Higher = stricter priority. (Vanilla ≈ 40)");
             float oldSpacing = settings.tierSpacing;
-            int tierSpacingInt = (int)settings.tierSpacing;
-            ls.IntEntry(ref tierSpacingInt, ref tierSpacingBuffer, 10, 999);
-            settings.tierSpacing = Mathf.Clamp(tierSpacingInt, 10, 999);
+            Rect tierSpacingRow = ls.GetRect(RowHeight);
+            tierSpacingBuffer = Widgets.TextField(tierSpacingRow.LeftPartPixels(120f), tierSpacingBuffer);
+            if (int.TryParse(tierSpacingBuffer, out int parsedSpacing))
+                settings.tierSpacing = Mathf.Clamp(parsedSpacing, 0, 999);
             if (settings.tierSpacing != oldSpacing)
                 settings.RebuildScores();
             ls.Gap(Margin);
