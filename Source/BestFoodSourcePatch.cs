@@ -20,29 +20,13 @@ namespace AnimalFoodPreference
     ///
     /// For humanlike/mech pawns, the original method runs unmodified.
     /// </summary>
-    [HarmonyPatch(typeof(FoodUtility), nameof(FoodUtility.BestFoodSourceOnMap),
-        new Type[]
-        {
-            typeof(Pawn), typeof(Pawn), typeof(bool), typeof(ThingDef),
-            typeof(FoodPreferability), typeof(bool), typeof(bool), typeof(bool),
-            typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool),
-            typeof(bool), typeof(bool), typeof(bool), typeof(FoodPreferability),
-            typeof(float?), typeof(bool)
-        },
-        new ArgumentType[]
-        {
-            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Ref,
-            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal,
-            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal,
-            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal,
-            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal
-        })]
+    [HarmonyPatch(typeof(FoodUtility), nameof(FoodUtility.BestFoodSourceOnMap))]
     public static class BestFoodSourceOnMap_Patch
     {
-        // Pooled to avoid per-search allocations. Safe because RimWorld's game loop is
-        // single-threaded and the validators called during FindBestByOptimality never
-        // re-enter this Prefix. If that assumption changes, switch back to a local allocation.
+        // Reused across calls to avoid per-search GC pressure.
+        // Safe because RimWorld's game loop is single-threaded.
         private static readonly HashSet<Thing> nearbyAnimalFood = new HashSet<Thing>();
+
         public static bool Prefix(
             ref Thing __result,
             Pawn getter,
