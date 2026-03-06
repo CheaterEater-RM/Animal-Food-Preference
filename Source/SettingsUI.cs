@@ -26,6 +26,7 @@ namespace AnimalFoodPreference
         private const float LabelWidth = 200f;
         private const float DropdownWidth = 160f;
         private const float SearchBarHeight = 28f;
+        private const float BottomPadding = 10f;
 
         // ── Cached state ─────────────────────────────────────────────
         private static Vector2 tierScrollPos;
@@ -169,9 +170,11 @@ namespace AnimalFoodPreference
             DrawSectionHeader(ref y, inRect, "Food Category Priority Order",
                 "Higher in the list = animals prefer it first. Use ▲▼ to reorder.");
 
-            // Tier scroll view — up to 40 % of remaining space, at least 5 rows
+            // Tier scroll view — up to 40 % of remaining space.
+            // Clamp to available space so it never extends past inRect.
             float tierContentH = settings.tierOrder.Count * RowHeight;
-            float tierScrollH  = Mathf.Max(Mathf.Min(tierContentH, remaining * 0.40f), 5 * RowHeight);
+            float tierScrollH  = Mathf.Clamp(Mathf.Min(tierContentH, remaining * 0.40f),
+                                     5 * RowHeight, remaining - 6 * RowHeight);
             Rect tierOuter = new Rect(inRect.x, y, inRect.width, tierScrollH);
             Rect tierInner = new Rect(0f, 0f, inRect.width - 16f, tierContentH);
             Widgets.BeginScrollView(tierOuter, ref tierScrollPos, tierInner);
@@ -188,8 +191,11 @@ namespace AnimalFoodPreference
             if (newSearch != searchText) { searchText = newSearch; UpdateFilter(); }
             y += SearchBarHeight + Margin;
 
-            // Override scroll view — fills everything that remains
-            float defScrollH  = Mathf.Max(inRect.yMax - y - 4f, 4 * RowHeight);
+            // Override scroll view — fills everything that remains, leaving
+            // padding so rows don't overlap with the dialog's Close button.
+            // Clamp to available space (never extend past inRect).
+            float availableH = inRect.yMax - y - BottomPadding;
+            float defScrollH = Mathf.Max(availableH, 0f);
             Rect defOuter = new Rect(inRect.x, y, inRect.width, defScrollH);
             Rect defInner = new Rect(0f, 0f, inRect.width - 16f, filteredFoodDefs.Count * RowHeight);
             Widgets.BeginScrollView(defOuter, ref defScrollPos, defInner);
