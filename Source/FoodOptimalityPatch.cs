@@ -23,7 +23,8 @@ namespace AnimalFoodPreference
     ///
     /// Total: ~3 dictionary lookups in the worst case, zero allocations.
     /// </summary>
-    [HarmonyPatch(typeof(FoodUtility), nameof(FoodUtility.FoodOptimality))]
+    [HarmonyPatch(typeof(FoodUtility), nameof(FoodUtility.FoodOptimality),
+        new Type[] { typeof(Pawn), typeof(Thing), typeof(ThingDef), typeof(float), typeof(bool) })]
     public static class FoodOptimality_Patch
     {
         public static void Postfix(ref float __result, Pawn eater, Thing foodSource, ThingDef foodDef)

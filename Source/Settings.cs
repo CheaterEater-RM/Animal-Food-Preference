@@ -52,9 +52,9 @@ namespace AnimalFoodPreference
         /// Maximum Manhattan-distance (in cells) a tame animal will search for food.
         /// Candidates beyond this radius are skipped entirely, limiting the search
         /// set and reducing per-search CPU cost. 0 = unlimited (search whole map).
-        /// Default: 0.
+        /// Default: 100.
         /// </summary>
-        public int maxSearchDistance = 0;
+        public int maxSearchDistance = 100;
 
         // ── Constants ────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ namespace AnimalFoodPreference
             defOverrides.Clear();
             tierSpacing = 100f;
             distanceMultiplier = 1f;
-            maxSearchDistance = 0;
+            maxSearchDistance = 100;
             RebuildScores();
             FoodClassifier.ClearCache();
         }
@@ -121,7 +121,7 @@ namespace AnimalFoodPreference
             base.ExposeData();
             Scribe_Values.Look(ref tierSpacing, "tierSpacing", 100f);
             Scribe_Values.Look(ref distanceMultiplier, "distanceMultiplier", 1f);
-            Scribe_Values.Look(ref maxSearchDistance, "maxSearchDistance", 0);
+            Scribe_Values.Look(ref maxSearchDistance, "maxSearchDistance", 100);
 
             // Serialize tier order as list of strings (enum names for readability)
             List<string> tierNames = tierOrder?.Select(c => c.ToString()).ToList();

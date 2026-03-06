@@ -20,9 +20,29 @@ namespace AnimalFoodPreference
     ///
     /// For humanlike/mech pawns, the original method runs unmodified.
     /// </summary>
-    [HarmonyPatch(typeof(FoodUtility), nameof(FoodUtility.BestFoodSourceOnMap))]
+    [HarmonyPatch(typeof(FoodUtility), nameof(FoodUtility.BestFoodSourceOnMap),
+        new Type[]
+        {
+            typeof(Pawn), typeof(Pawn), typeof(bool), typeof(ThingDef),
+            typeof(FoodPreferability), typeof(bool), typeof(bool), typeof(bool),
+            typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool),
+            typeof(bool), typeof(bool), typeof(bool), typeof(FoodPreferability),
+            typeof(float?), typeof(bool)
+        },
+        new ArgumentType[]
+        {
+            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Ref,
+            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal,
+            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal,
+            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal,
+            ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal
+        })]
     public static class BestFoodSourceOnMap_Patch
     {
+        // Pooled to avoid per-search allocations. Safe because RimWorld's game loop is
+        // single-threaded and the validators called during FindBestByOptimality never
+        // re-enter this Prefix. If that assumption changes, switch back to a local allocation.
+        private static readonly HashSet<Thing> nearbyAnimalFood = new HashSet<Thing>();
         public static bool Prefix(
             ref Thing __result,
             Pawn getter,
@@ -129,7 +149,7 @@ namespace AnimalFoodPreference
             };
 
             // ── Filter out food other nearby animals are eating ──────────
-            HashSet<Thing> nearbyAnimalFood = new HashSet<Thing>();
+            nearbyAnimalFood.Clear();
             foreach (Thing item in GenRadial.RadialDistinctThingsAround(
                 getter.Position, getter.Map, 2f, useCenter: true))
             {
@@ -156,7 +176,7 @@ namespace AnimalFoodPreference
                 bool isAllowedCorpse = allowCorpse && t is Corpse;
                 if (!isAllowedCorpse &&
                     !(t is Building_NutrientPasteDispenser) &&
-                    (int)t.def.ingestible.preferability <= 2)
+                    t.def.ingestible.preferability <= FoodPreferability.DesperateOnlyForHumanlikes)
                     return false;
                 return !t.IsNotFresh();
             };

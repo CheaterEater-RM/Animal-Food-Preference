@@ -32,7 +32,8 @@ namespace AnimalFoodPreference
         private static Vector2 defScrollPos;
         private static string searchText = "";
         private static string tierSpacingBuffer = "100";
-        private static string maxSearchDistanceBuffer = "0";
+        private static string maxSearchDistanceBuffer = "100";
+        private static bool _buffersInitialized;
         private static List<ThingDef> allFoodDefs;
         private static List<ThingDef> filteredFoodDefs;
 
@@ -106,6 +107,12 @@ namespace AnimalFoodPreference
         public static void DoSettingsWindow(Rect inRect, AnimalFoodPreferenceSettings settings)
         {
             EnsureFoodDefList();
+            if (!_buffersInitialized)
+            {
+                tierSpacingBuffer = ((int)settings.tierSpacing).ToString();
+                maxSearchDistanceBuffer = settings.maxSearchDistance.ToString();
+                _buffersInitialized = true;
+            }
 
             // ── Phase 1: Config controls (Listing_Standard, no scroll views) ──
             var ls = new Listing_Standard();
@@ -114,8 +121,8 @@ namespace AnimalFoodPreference
             ls.Label("Tier Spacing — points between adjacent tiers. Higher = stricter priority. (Vanilla ≈ 40)");
             float oldSpacing = settings.tierSpacing;
             int tierSpacingInt = (int)settings.tierSpacing;
-            ls.IntEntry(ref tierSpacingInt, ref tierSpacingBuffer, 10, 200);
-            settings.tierSpacing = tierSpacingInt;
+            ls.IntEntry(ref tierSpacingInt, ref tierSpacingBuffer, 10, 999);
+            settings.tierSpacing = Mathf.Clamp(tierSpacingInt, 10, 999);
             if (settings.tierSpacing != oldSpacing)
                 settings.RebuildScores();
             ls.Gap(Margin);
@@ -143,6 +150,7 @@ namespace AnimalFoodPreference
             {
                 settings.ResetToDefaults();
                 allFoodDefs = null;
+                _buffersInitialized = false;
             }
             ls.Gap(SectionGap);
 
