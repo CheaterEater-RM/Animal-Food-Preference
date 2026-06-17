@@ -38,6 +38,9 @@ project.lock.json
 Thumbs.db
 .DS_Store
 
+# Dubs Performance Analyzer profiling tab — dev-only, must not ship to Steam
+Analyzer.xml
+
 # Build logs
 build.log
 build_err.log

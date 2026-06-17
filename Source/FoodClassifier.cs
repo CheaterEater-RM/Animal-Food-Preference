@@ -138,6 +138,10 @@ namespace AnimalFoodPreference
         {
             switch (def.ingestible.preferability)
             {
+                // MealTerrible (baby food, some modded cheap meals) sits just below
+                // MealAwful in the enum; lump it with the cheapest meal tier rather
+                // than letting it fall through to Other.
+                case FoodPreferability.MealTerrible:
                 case FoodPreferability.MealAwful:
                     return FoodCategory.MealNutrientPaste;
                 case FoodPreferability.MealSimple:
