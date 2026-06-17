@@ -2,7 +2,7 @@
 # RimWorld Mod .gitignore
 # =========================
 
-# Machine-specific game paths (lives outside repo but just in case)
+# Machine-specific game paths
 RimWorld.Paths.props
 
 # Visual Studio
@@ -19,9 +19,8 @@ RimWorld.Paths.props
 [Rr]elease/
 *.pdb
 
-# Don't commit compiled DLLs in Assemblies — they're build output
-# (uncomment if you DO want to ship pre-built DLLs for non-dev users)
-# 1.6/Assemblies/*.dll
+# Debug symbols that land in the output folder
+1.6/Assemblies/*.pdb
 
 # NuGet
 *.nuget.props
@@ -34,12 +33,12 @@ project.lock.json
 # Rider
 .idea/
 
+# .NET tool installs
+.dotnet/
+
 # OS files
 Thumbs.db
 .DS_Store
-
-# Dubs Performance Analyzer profiling tab — dev-only, must not ship to Steam
-Analyzer.xml
 
 # Build logs
 build.log
@@ -47,3 +46,21 @@ build_err.log
 build_restore.log
 build_restore_err.log
 *.binlog
+
+# RimWorld / Harmony debug logs
+harmony.log.txt
+Player.log
+
+# Editor workspace files
+*.code-workspace
+
+# Claude / agent scratch
+.claude/
+
+# .github / normally just copilot instructions, not used much anymore.
+.github/
+
+# Agent instruction files
+CLAUDE.md
+AGENTS.md
+

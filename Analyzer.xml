@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dubs Performance Analyzer profiling tab for Animal Food Preference.
+  Adds an "AnimalFoodPreference" tab to the Analyzer with the mod's hot paths
+  pre-wired so they can be profiled directly. Only active when Dubs Performance
+  Analyzer is installed; harmless otherwise.
+
+  ====================================================================
+  HARD RULES (Dubs Performance Analyzer parses this with DynamicTypeBuilder;
+  violating these crashes Analyzer init, not just this tab):
+
+  1. NO comments or stray text as DIRECT children of <Analyzer>.
+     XmlParser.Parse iterates every child node of <Analyzer> and calls
+     CreateType(node.Name, ...) without skipping XmlComment nodes. A comment's
+     node.Name is "#comment", stripped to "comment" — so two top-level comments
+     both DefineType("comment") => "Duplicate type name within an assembly" crash
+     at DynamicTypeBuilder.CreateType. Keep ALL commentary up here, above the
+     root element (a comment before <Analyzer> is not a child of it — safe).
+
+  2. Tab names are reduced to LETTERS ONLY before becoming a type
+     (string.Concat over char.IsLetter). "AnimalFoodPreference" is already
+     letters-only and unique, so it is safe.
+
+  3. <Types> already profiles every method on a type. Do NOT also list that
+     same type's methods under <Methods> on the same tab — redundant double-add.
+     (Below, <Methods> lists only the patched VANILLA host methods, not our patch
+     types — no overlap.)
+
+  4. The parser looks for Analyzer.xml. Keep it capitalized "Analyzer.xml".
+
+  5. Dev-only file — git-ignored so it is not committed/shipped to Steam.
+
+  Element guide (method syntax is Namespace.Type:Method — return/args inferred):
+    <Types>    profile every method on the listed type
+    <Methods>  profile a single method (used here for the patched host methods)
+
+  Docs: https://github.com/Dubwise56/Dubs-Performance-Analyzer#using-the-analyzerxml
+-->
+<Analyzer>
+    <AnimalFoodPreference>
+        <Types>
+            <li>AnimalFoodPreference.BestFoodSourceOnMap_Patch</li>
+            <li>AnimalFoodPreference.FoodOptimality_Patch</li>
+            <li>AnimalFoodPreference.FoodClassifier</li>
+        </Types>
+        <Methods>
+            <li>RimWorld.FoodUtility:BestFoodSourceOnMap</li>
+            <li>RimWorld.FoodUtility:FoodOptimality</li>
+        </Methods>
+    </AnimalFoodPreference>
+</Analyzer>
