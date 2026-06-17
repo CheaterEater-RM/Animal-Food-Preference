@@ -257,6 +257,7 @@ namespace AnimalFoodPreference
             List<Thing> things = region.ListerThings.ThingsMatching(req);
             Thing best = null;
             float bestPrio = float.MinValue;
+            float bestOffset = float.MinValue;
 
             for (int i = 0; i < things.Count; i++)
             {
@@ -266,27 +267,25 @@ namespace AnimalFoodPreference
                 float dist = (root - t.Position).LengthManhattan;
                 if (dist > maxDistance)
                     continue;
-                ThingDef fd = FoodUtility.GetFinalIngestibleDef(t);
-                float prio = AnimalFoodPreferenceSettings.GetScoreOffset(FoodClassifier.Classify(fd))
-                             - dist * distanceMultiplier;
+                float offset = AnimalFoodPreferenceSettings.GetScoreOffset(
+                    FoodClassifier.Classify(FoodUtility.GetFinalIngestibleDef(t)));
+                float prio = offset - dist * distanceMultiplier;
                 if (prio <= bestPrio)
                     continue;
                 if (validator != null && !validator(t))
                     continue;
                 best = t;
                 bestPrio = prio;
+                bestOffset = offset;
             }
 
             if (best == null)
                 return null;
 
             // Only short-circuit when the local winner is the top preferred tier.
-            ThingDef bestDef = FoodUtility.GetFinalIngestibleDef(best);
-            if (AnimalFoodPreferenceSettings.GetScoreOffset(FoodClassifier.Classify(bestDef))
-                >= AnimalFoodPreferenceSettings.BaseOffset)
-            {
+            // bestOffset was captured during the scan, so no re-classification is needed.
+            if (bestOffset >= AnimalFoodPreferenceSettings.BaseOffset)
                 return best;
-            }
             return null;
         }
 

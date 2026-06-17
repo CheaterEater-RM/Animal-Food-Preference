@@ -20,23 +20,38 @@ namespace AnimalFoodPreference
     /// </summary>
     public static class FoodClassifier
     {
+        /// <summary>
+        /// Effective-category cache used by <see cref="Classify"/>. Player overrides are
+        /// baked into the stored value, so the hot path (every food candidate, per animal,
+        /// per search) is a single ThingDef-keyed lookup with no per-call string-keyed
+        /// override probe. Safe because every override change clears the cache:
+        /// SetOverride, RebuildScores, and ResetToDefaults all call <see cref="ClearCache"/>.
+        /// </summary>
         private static readonly Dictionary<ThingDef, FoodCategory> cache =
             new Dictionary<ThingDef, FoodCategory>();
 
         /// <summary>
-        /// Gets the food category for a ThingDef. Checks player overrides first,
-        /// then falls through to auto-classification with caching.
+        /// Auto-classification cache used by <see cref="ClassifyAuto"/> (settings UI only).
+        /// Never has overrides applied, so it is kept separate from <see cref="cache"/>.
+        /// </summary>
+        private static readonly Dictionary<ThingDef, FoodCategory> autoCache =
+            new Dictionary<ThingDef, FoodCategory>();
+
+        /// <summary>
+        /// Gets the food category for a ThingDef, honouring any player override.
         /// </summary>
         public static FoodCategory Classify(ThingDef def)
         {
-            // Player override takes absolute precedence
-            if (AnimalFoodPreferenceSettings.TryGetOverride(def, out FoodCategory overridden))
-                return overridden;
-
+            // Cache-first: the stored value already accounts for any player override
+            // (the cache is cleared whenever overrides change), so the common path is a
+            // single lookup with no string-keyed override probe.
             if (cache.TryGetValue(def, out FoodCategory cached))
                 return cached;
 
-            FoodCategory result = ClassifyInternal(def);
+            FoodCategory result =
+                AnimalFoodPreferenceSettings.TryGetOverride(def, out FoodCategory overridden)
+                    ? overridden
+                    : ClassifyInternal(def);
             cache[def] = result;
             return result;
         }
@@ -47,20 +62,21 @@ namespace AnimalFoodPreference
         /// </summary>
         public static FoodCategory ClassifyAuto(ThingDef def)
         {
-            if (cache.TryGetValue(def, out FoodCategory cached))
+            if (autoCache.TryGetValue(def, out FoodCategory cached))
                 return cached;
 
             FoodCategory result = ClassifyInternal(def);
-            cache[def] = result;
+            autoCache[def] = result;
             return result;
         }
 
         /// <summary>
-        /// Clears the classification cache. Call when settings change.
+        /// Clears both classification caches. Call when settings change.
         /// </summary>
         public static void ClearCache()
         {
             cache.Clear();
+            autoCache.Clear();
         }
 
         private static FoodCategory ClassifyInternal(ThingDef def)
