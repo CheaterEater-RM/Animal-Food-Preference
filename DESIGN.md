@@ -56,16 +56,20 @@ Animal wants food
   → BestFoodSourceOnMap_Patch.Prefix intercepts (player non-humanlike eaters only):
       1. Builds food validator (same checks as vanilla)
       2. Filters out food other nearby animals are eating
-      3. Runs a BOUNDED region BFS (GenClosest.RegionwiseBFSWorker) seeded with a
-         cheap priority function instead of calling FoodUtility.FoodOptimality:
+      3. FAST PATH: scans only the animal's current region; if the best valid candidate
+         there is the TOP tier (offset == BaseOffset, i.e. tierOrder[0]), returns it
+         immediately. Covers the very common "grazer standing in a grassy pen" case and
+         skips the full scan. Safe because no other region can hold a better tier.
+      4. Otherwise runs a BOUNDED region BFS (GenClosest.RegionwiseBFSWorker) seeded with
+         a cheap priority function instead of calling FoodUtility.FoodOptimality:
             priority(t) = Settings.GetScoreOffset(FoodClassifier.Classify(def))
                           − dist × distanceMultiplier
          The BFS reuses vanilla's pooled region machinery: it picks the highest-priority
          reachable candidate (nearest as tie-break), bounded by maxRegions (≈100, like
-         vanilla's GetMaxRegionsToScan) and the configured distance cap. minRegions is
+         vanilla's GetMaxRegionsToScan) and the optional distance cap. minRegions is
          set equal to maxRegions so it scans the whole bounded neighbourhood rather than
          stopping at the nearest (vanilla's behaviour, which would ignore tiers).
-      4. If nothing found, sets desperate=true and retries with the relaxed base
+      5. If nothing found, sets desperate=true and retries with the relaxed base
          validator (also allows rotting-but-not-dessicated food, matching vanilla).
   → Animal eats the best-tier reachable food
 
@@ -101,6 +105,8 @@ AnimalFoodPreference/
 | Setting | Type | Description |
 |---|---|---|
 | Tier spacing | Integer (10–200) | Points between adjacent tiers. Higher = stricter priority. Default 100. |
+| Distance multiplier | Float (0.5–5.0) | Scales the distance penalty in the priority score. 1.0 = vanilla weighting; higher favours closer food. Default 1.0. |
+| Max search distance | Integer (cells) | Optional extra cap on search radius. 0 = no extra cap (search is always region-bounded, ~100 regions, never whole-map). Default 0. |
 | Tier order | Reorderable list | Drag food categories up/down to change priority |
 | Per-def overrides | Per-item dropdown | Override auto-classification for individual food items |
 
@@ -136,11 +142,18 @@ AnimalFoodPreference/
 
 - **BestFoodSourceOnMap prefix**: Uses vanilla's bounded region BFS
   (`GenClosest.RegionwiseBFSWorker`), so cost is bounded by nearby regions
-  (≈100, plus the configurable distance cap) and does **not** scale with total map
+  (≈100, plus the optional distance cap) and does **not** scale with total map
   size — critical for large herds on grassy maps where the old whole-map scan walked
   every plant on the map. The expensive validator (WillEat / CanReserve / reachability)
   only runs for candidates that beat the current best priority; the per-candidate work
   is just a cached classification lookup and a distance subtraction.
+- **Current-region fast path**: before the full scan, the prefix checks only the animal's
+  own region and short-circuits if the best valid candidate there is the top tier. The
+  common grazing case (animal already among its preferred food) costs a single-region
+  scan instead of a full bounded BFS.
+- **Distance cap default**: `maxSearchDistance` defaults to **0** (no extra cap — the
+  search is region-bounded only), matching vanilla's behaviour. Raise it to deliberately
+  restrict how far animals roam for food.
 - **No per-candidate `FoodOptimality`**: the hot loop scores via cheap tier offset minus
   scaled distance. `FoodUtility.FoodOptimality` (which does a `CompRottable` lookup,
   allocates a thoughts list, and loops traits) is no longer called per candidate. The

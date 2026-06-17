@@ -194,6 +194,21 @@ namespace AnimalFoodPreference
                 ForbidUtility.CaresAboutForbidden(getter, cellTarget: true) &&
                 getter.playerSettings?.EffectiveAreaRestrictionInPawnCurrentMap != null;
 
+            // ── Fast path: top-tier food in the animal's current region ──
+            // Very common (e.g. grazers standing in a grassy pen): if the most-preferred
+            // tier is already in the animal's own region, take it and skip the full bounded
+            // region scan. Only triggers when the best local candidate is the TOP tier, so
+            // it can never make the animal settle for a worse tier than the full scan would
+            // reach. (It may pick a top-tier item a few cells farther than the global nearest,
+            // which is irrelevant — the animal still eats its most-preferred food.)
+            Thing quickPick = TryGetTopTierFoodInRegion(getter, thingRequest, animalValidator, distMult, maxDist);
+            if (quickPick != null)
+            {
+                foodDef = FoodUtility.GetFinalIngestibleDef(quickPick);
+                __result = quickPick;
+                return false;
+            }
+
             // ── Bounded region scan, scored by tier (normal pass) ────────
             Thing bestThing = FindBestFood(
                 getter, thingRequest, animalValidator, distMult, maxDist, maxRegions, ignoreForbiddenRegions);
@@ -215,6 +230,64 @@ namespace AnimalFoodPreference
 
             __result = bestThing;
             return false;
+        }
+
+        /// <summary>
+        /// Fast path for the very common case of an animal standing in a region that
+        /// already contains its most-preferred food tier (e.g. a grazer in a grassy pen).
+        ///
+        /// Scans only the getter's current region for the best-scoring valid candidate.
+        /// Returns it ONLY if that candidate is the top preferred tier — i.e. its tier
+        /// offset equals the maximum (BaseOffset, always tierOrder[0]). In that case no
+        /// other region can hold a better tier, so the full bounded scan is unnecessary.
+        /// If the local best is not top tier, returns null so the caller falls through to
+        /// the full bounded scan (a better tier may lie further out).
+        ///
+        /// Things in the getter's own region are reachable by construction, so no extra
+        /// reachability check is needed beyond the validator.
+        /// </summary>
+        private static Thing TryGetTopTierFoodInRegion(
+            Pawn getter, ThingRequest req, Predicate<Thing> validator, float distanceMultiplier, float maxDistance)
+        {
+            Region region = getter.Position.GetRegion(getter.Map);
+            if (region == null)
+                return null;
+
+            IntVec3 root = getter.Position;
+            List<Thing> things = region.ListerThings.ThingsMatching(req);
+            Thing best = null;
+            float bestPrio = float.MinValue;
+
+            for (int i = 0; i < things.Count; i++)
+            {
+                Thing t = things[i];
+                if (!t.Spawned)
+                    continue;
+                float dist = (root - t.Position).LengthManhattan;
+                if (dist > maxDistance)
+                    continue;
+                ThingDef fd = FoodUtility.GetFinalIngestibleDef(t);
+                float prio = AnimalFoodPreferenceSettings.GetScoreOffset(FoodClassifier.Classify(fd))
+                             - dist * distanceMultiplier;
+                if (prio <= bestPrio)
+                    continue;
+                if (validator != null && !validator(t))
+                    continue;
+                best = t;
+                bestPrio = prio;
+            }
+
+            if (best == null)
+                return null;
+
+            // Only short-circuit when the local winner is the top preferred tier.
+            ThingDef bestDef = FoodUtility.GetFinalIngestibleDef(best);
+            if (AnimalFoodPreferenceSettings.GetScoreOffset(FoodClassifier.Classify(bestDef))
+                >= AnimalFoodPreferenceSettings.BaseOffset)
+            {
+                return best;
+            }
+            return null;
         }
 
         /// <summary>
