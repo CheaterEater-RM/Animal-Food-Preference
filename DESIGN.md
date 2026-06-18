@@ -66,7 +66,7 @@ Animal wants food
                           − dist × distanceMultiplier
          The BFS reuses vanilla's pooled region machinery: it picks the highest-priority
          reachable candidate (nearest as tie-break), bounded by maxRegions (≈100, like
-         vanilla's GetMaxRegionsToScan) and the optional distance cap. minRegions is
+         vanilla's GetMaxRegionsToScan). minRegions is
          set equal to maxRegions so it scans the whole bounded neighbourhood rather than
          stopping at the nearest (vanilla's behaviour, which would ignore tiers).
       5. If nothing found, sets desperate=true and retries with the relaxed base
@@ -142,7 +142,7 @@ AnimalFoodPreference/
 
 - **BestFoodSourceOnMap prefix**: Uses vanilla's bounded region BFS
   (`GenClosest.RegionwiseBFSWorker`), so cost is bounded by nearby regions
-  (≈100, plus the optional distance cap) and does **not** scale with total map
+  (≈100) and does **not** scale with total map
   size — critical for large herds on grassy maps where the old whole-map scan walked
   every plant on the map. The expensive validator (WillEat / CanReserve / reachability)
   only runs for candidates that beat the current best priority; the per-candidate work
@@ -151,9 +151,6 @@ AnimalFoodPreference/
   own region and short-circuits if the best valid candidate there is the top tier. The
   common grazing case (animal already among its preferred food) costs a single-region
   scan instead of a full bounded BFS.
-- **Distance cap default**: `maxSearchDistance` defaults to **0** (no extra cap — the
-  search is region-bounded only), matching vanilla's behaviour. Raise it to deliberately
-  restrict how far animals roam for food.
 - **No per-candidate `FoodOptimality`**: the hot loop scores via cheap tier offset minus
   scaled distance. `FoodUtility.FoodOptimality` (which does a `CompRottable` lookup,
   allocates a thoughts list, and loops traits) is no longer called per candidate. The

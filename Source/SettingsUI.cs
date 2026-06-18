@@ -33,7 +33,6 @@ namespace AnimalFoodPreference
         private static Vector2 defScrollPos;
         private static string searchText = "";
         private static string tierSpacingBuffer = "100";
-        private static string maxSearchDistanceBuffer = "0";
         private static string distanceMultiplierBuffer = "1.00";
         private static bool _buffersInitialized;
         private static List<ThingDef> allFoodDefs;
@@ -130,7 +129,6 @@ namespace AnimalFoodPreference
             if (!_buffersInitialized)
             {
                 tierSpacingBuffer = ((int)settings.tierSpacing).ToString();
-                maxSearchDistanceBuffer = settings.maxSearchDistance.ToString();
                 distanceMultiplierBuffer = settings.distanceMultiplier.ToString("0.00");
                 _buffersInitialized = true;
             }
@@ -150,7 +148,7 @@ namespace AnimalFoodPreference
             var ls = new Listing_Standard();
             ls.Begin(leftCol);
 
-            ls.Label("Tier Spacing — points between adjacent tiers. Higher = stricter priority.");
+            ls.Label("Tier Spacing: points between adjacent tiers. Higher = stricter priority vs. distance.");
             float oldSpacing = settings.tierSpacing;
             Rect tierSpacingRow = ls.GetRect(RowHeight);
             tierSpacingBuffer = Widgets.TextField(tierSpacingRow.LeftPartPixels(120f), tierSpacingBuffer);
@@ -160,7 +158,7 @@ namespace AnimalFoodPreference
                 settings.RebuildScores();
             ls.Gap(Margin);
 
-            ls.Label("Distance Multiplier — how strongly distance penalises far-away food. 1.0 = vanilla.");
+            ls.Label("Distance Multiplier: how strongly distance penalises far-away food. 1.0 = vanilla.");
             Rect distRow = ls.GetRect(RowHeight);
             // The slider is authoritative while being dragged; the value box only writes
             // back when the player actually edits its text (it has its own buffer). Feeding
@@ -186,18 +184,6 @@ namespace AnimalFoodPreference
                 if (float.TryParse(typedDist, out float parsedDist))
                     settings.distanceMultiplier = Mathf.Clamp(parsedDist, 0.5f, 5f);
             }
-            ls.Gap(Margin);
-
-            // Compact one-liner; the full explanation lives in the tooltip.
-            Rect maxDistLabelRect = ls.Label("Max Search Distance — extra cap in cells; 0 = region-bounded only.");
-            TooltipHandler.TipRegion(maxDistLabelRect,
-                "Distance cap on how far a tame animal looks for food. The search " +
-                "is always bounded to ~100 nearby regions (vanilla-style); " +
-                "0 = no cap. This is an additional limit.");
-            Rect maxDistRow = ls.GetRect(RowHeight);
-            maxSearchDistanceBuffer = Widgets.TextField(maxDistRow.LeftPartPixels(120f), maxSearchDistanceBuffer);
-            if (int.TryParse(maxSearchDistanceBuffer, out int parsedMaxDist))
-                settings.maxSearchDistance = Mathf.Max(0, parsedMaxDist);
             ls.Gap(Margin);
 
             if (ls.ButtonText("Reset to Defaults", widthPct: 0.5f))
