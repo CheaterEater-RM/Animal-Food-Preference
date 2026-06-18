@@ -83,7 +83,6 @@ namespace AnimalFoodPreference
         {
             FoodCategory.WildPlant,
             FoodCategory.FlowerOrDecor,
-            FoodCategory.FoodCrop,
             FoodCategory.Corpse,
             FoodCategory.Hay,
             FoodCategory.Kibble,
@@ -95,6 +94,9 @@ namespace AnimalFoodPreference
             FoodCategory.Pemmican,
             FoodCategory.InsectJelly,
             FoodCategory.SurvivalMeal,
+            // Food crops default near the bottom: players generally don't want animals
+            // grazing their standing crops. Kept just above Other (the unknown-food catch-all).
+            FoodCategory.FoodCrop,
             FoodCategory.Other,
         };
 

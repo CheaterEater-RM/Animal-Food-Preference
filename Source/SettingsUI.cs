@@ -34,6 +34,7 @@ namespace AnimalFoodPreference
         private static string searchText = "";
         private static string tierSpacingBuffer = "100";
         private static string maxSearchDistanceBuffer = "0";
+        private static string distanceMultiplierBuffer = "1.00";
         private static bool _buffersInitialized;
         private static List<ThingDef> allFoodDefs;
         private static List<ThingDef> filteredFoodDefs;
@@ -107,11 +108,30 @@ namespace AnimalFoodPreference
 
         public static void DoSettingsWindow(Rect inRect, AnimalFoodPreferenceSettings settings)
         {
+            // The vanilla mod-settings dialog is a fixed 900×700, whose content area cannot
+            // hold the config controls plus all 15 tier rows. Grow the live dialog once so the
+            // whole tier list fits; re-centre only when the size actually differs so we don't
+            // fight a player drag. Converges after one frame.
+            var win = Find.WindowStack?.WindowOfType<RimWorld.Dialog_ModSettings>();
+            if (win != null)
+            {
+                float tw = 920f;
+                float th = Mathf.Min(UI.screenHeight - 35f, 1040f);
+                if (Mathf.Abs(win.windowRect.width - tw) > 1f || Mathf.Abs(win.windowRect.height - th) > 1f)
+                {
+                    win.windowRect.width = tw;
+                    win.windowRect.height = th;
+                    win.windowRect.x = (UI.screenWidth - tw) / 2f;
+                    win.windowRect.y = (UI.screenHeight - th) / 2f;
+                }
+            }
+
             EnsureFoodDefList();
             if (!_buffersInitialized)
             {
                 tierSpacingBuffer = ((int)settings.tierSpacing).ToString();
                 maxSearchDistanceBuffer = settings.maxSearchDistance.ToString();
+                distanceMultiplierBuffer = settings.distanceMultiplier.ToString("0.00");
                 _buffersInitialized = true;
             }
 
@@ -131,16 +151,30 @@ namespace AnimalFoodPreference
 
             ls.Label("Distance Multiplier — how strongly distance penalises far-away food. 1.0 = vanilla.");
             Rect distRow = ls.GetRect(RowHeight);
-            float newDistMult = Widgets.HorizontalSlider(
-                distRow.LeftPartPixels(distRow.width - 64f),
-                settings.distanceMultiplier, 0.5f, 5f,
-                middleAlignment: true, leftAlignedLabel: "0.5×", rightAlignedLabel: "5.0×");
+            // The slider is authoritative while being dragged; the value box only writes
+            // back when the player actually edits its text (it has its own buffer). Feeding
+            // the box the live value every frame — the old approach — silently clobbered the
+            // drag, which is why the slider appeared frozen. Snaps to 0.05 via roundTo.
+            Rect sliderRect = new Rect(distRow.x, distRow.y, distRow.width - 70f, distRow.height);
             Rect distValRect = new Rect(distRow.xMax - 60f, distRow.y, 60f, distRow.height);
-            if (float.TryParse(
-                    Widgets.TextField(distValRect, settings.distanceMultiplier.ToString("F1")),
-                    out float parsedDist))
-                newDistMult = Mathf.Clamp(parsedDist, 0.5f, 5f);
-            settings.distanceMultiplier = (float)System.Math.Round(newDistMult, 1);
+
+            float sliderVal = Widgets.HorizontalSlider(
+                sliderRect, settings.distanceMultiplier, 0.5f, 5f,
+                middleAlignment: true, leftAlignedLabel: "0.5×", rightAlignedLabel: "5.0×",
+                roundTo: 0.05f);
+            if (!Mathf.Approximately(sliderVal, settings.distanceMultiplier))
+            {
+                settings.distanceMultiplier = sliderVal;
+                distanceMultiplierBuffer = sliderVal.ToString("0.00");
+            }
+
+            string typedDist = Widgets.TextField(distValRect, distanceMultiplierBuffer);
+            if (typedDist != distanceMultiplierBuffer)
+            {
+                distanceMultiplierBuffer = typedDist;
+                if (float.TryParse(typedDist, out float parsedDist))
+                    settings.distanceMultiplier = Mathf.Clamp(parsedDist, 0.5f, 5f);
+            }
             ls.Gap(Margin);
 
             ls.Label("Max Search Distance — optional extra cap (cells) on how far animals look for food. " +
@@ -172,11 +206,13 @@ namespace AnimalFoodPreference
             DrawSectionHeader(ref y, inRect, "Food Category Priority Order",
                 "Higher in the list = animals prefer it first. Use ▲▼ to reorder.");
 
-            // Tier scroll view — up to 40 % of remaining space.
-            // Clamp to available space so it never extends past inRect.
+            // Tier scroll view — sized to show ALL rows when there's room (the list is a
+            // fixed 15 categories), reserving a minimum scrollable block for the override
+            // list below. Only scrolls internally on very short screens.
             float tierContentH = settings.tierOrder.Count * RowHeight;
-            float tierScrollH  = Mathf.Clamp(Mathf.Min(tierContentH, remaining * 0.40f),
-                                     5 * RowHeight, remaining - 6 * RowHeight);
+            float minOverrideBlock = SearchBarHeight + Margin + 4 * RowHeight;
+            float tierScrollH  = Mathf.Clamp(tierContentH, 3 * RowHeight,
+                                     Mathf.Max(3 * RowHeight, remaining - minOverrideBlock));
             Rect tierOuter = new Rect(inRect.x, y, inRect.width, tierScrollH);
             Rect tierInner = new Rect(0f, 0f, inRect.width - 16f, tierContentH);
             Widgets.BeginScrollView(tierOuter, ref tierScrollPos, tierInner);
@@ -240,8 +276,13 @@ namespace AnimalFoodPreference
                 Rect rankRect = new Rect(rowRect.x + Margin, rowRect.y, 24f, RowHeight);
                 Widgets.Label(rankRect, (i + 1).ToString());
 
+                // Representative icon
+                float iconSize = RowHeight - 6f;
+                Rect iconRect = new Rect(rankRect.xMax + Margin, rowRect.y + 3f, iconSize, iconSize);
+                CategoryIcons.Draw(iconRect, settings.tierOrder[i]);
+
                 // Category label
-                float labelX = rankRect.xMax + Margin;
+                float labelX = iconRect.xMax + Margin;
                 Rect labelRect = new Rect(labelX, rowRect.y, rowRect.width - labelX - (ButtonWidth * 2 + Margin * 3), RowHeight);
                 Text.Anchor = TextAnchor.MiddleLeft;
                 Widgets.Label(labelRect, GetCategoryLabel(settings.tierOrder[i]));

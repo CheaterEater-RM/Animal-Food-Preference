@@ -17,18 +17,18 @@ The default priority order (most preferred first):
 
 1. Wild grass, bushes, dandelions
 2. Flowers and decorative crops
-3. Food crops (harvestable plants)
-4. Corpses
-5. Hay
-6. Kibble
-7. Nutrient paste meals
-8. Simple meals
-9. Fine meals
-10. Lavish meals
-11. Raw vegetables and meat
-12. Pemmican
-13. Insect jelly
-14. Survival meals
+3. Corpses
+4. Hay
+5. Kibble
+6. Nutrient paste meals
+7. Simple meals
+8. Fine meals
+9. Lavish meals
+10. Raw vegetables and meat
+11. Pemmican
+12. Insect jelly
+13. Survival meals
+14. Food crops (harvestable plants)
 
 All priorities are fully configurable in Mod Settings.
 
