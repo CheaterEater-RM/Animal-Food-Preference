@@ -33,7 +33,7 @@ namespace AnimalFoodPreference
         private static Vector2 defScrollPos;
         private static string searchText = "";
         private static string tierSpacingBuffer = "100";
-        private static string maxSearchDistanceBuffer = "100";
+        private static string maxSearchDistanceBuffer = "0";
         private static bool _buffersInitialized;
         private static List<ThingDef> allFoodDefs;
         private static List<ThingDef> filteredFoodDefs;
@@ -143,7 +143,9 @@ namespace AnimalFoodPreference
             settings.distanceMultiplier = (float)System.Math.Round(newDistMult, 1);
             ls.Gap(Margin);
 
-            ls.Label("Max Search Distance — cells; 0 = whole map. Limits search set for better performance.");
+            ls.Label("Max Search Distance — optional extra cap (cells) on how far animals look for food. " +
+                "The search is always bounded to ~100 nearby regions (vanilla-style) and never scans the " +
+                "whole map; 0 = no extra cap (region-bounded only). Raise to tighten the search further.");
             Rect maxDistRow = ls.GetRect(RowHeight);
             maxSearchDistanceBuffer = Widgets.TextField(maxDistRow.LeftPartPixels(120f), maxSearchDistanceBuffer);
             if (int.TryParse(maxSearchDistanceBuffer, out int parsedMaxDist))

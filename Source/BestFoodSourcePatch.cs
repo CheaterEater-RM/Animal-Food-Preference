@@ -8,17 +8,20 @@ using Verse.AI;
 namespace AnimalFoodPreference
 {
     /// <summary>
-    /// Prefix on FoodUtility.BestFoodSourceOnMap for non-humanlike pawns.
+    /// Prefix on FoodUtility.BestFoodSourceOnMap for player-owned non-humanlike pawns.
     ///
     /// In vanilla, animals choose food via GenClosest.ClosestThingReachable which
-    /// picks the nearest valid food by distance — FoodOptimality is never called.
-    /// This makes our FoodOptimality postfix (tier offsets) completely ineffective.
+    /// picks the NEAREST valid food by distance — FoodOptimality is never called,
+    /// so our tier offsets would have no effect on the animal path.
     ///
-    /// This prefix intercepts the animal food search and replaces it with an
-    /// optimality-scored search (equivalent to SpawnedFoodSearchInnerScan),
-    /// so FoodOptimality — and our tier offset postfix — actually runs.
+    /// This prefix intercepts the animal food search and replaces it with a
+    /// tier-scored search that still honours vanilla's performance profile: it reuses
+    /// vanilla's own bounded region BFS (GenClosest.RegionwiseBFSWorker) and supplies
+    /// a cheap priority function (tier offset minus scaled distance). That keeps the
+    /// scan bounded to nearby regions instead of walking every food/plant on the map,
+    /// and avoids the per-candidate cost of FoodUtility.FoodOptimality entirely.
     ///
-    /// For humanlike/mech pawns, the original method runs unmodified.
+    /// For humanlike/mech getters feeding themselves, the original method runs unmodified.
     /// </summary>
     [HarmonyPatch(typeof(FoodUtility), nameof(FoodUtility.BestFoodSourceOnMap))]
     public static class BestFoodSourceOnMap_Patch
@@ -153,6 +156,7 @@ namespace AnimalFoodPreference
                 if (nearbyAnimalFood.Contains(t))
                     return false;
                 // Filter out desperate-only food in the normal (non-desperate) pass,
+                // matching vanilla's `preferability <= DesperateOnly` (2) cutoff,
                 // BUT exempt corpses when they are explicitly allowed — corpse ThingDefs
                 // carry DesperateOnly preferability at the def level even though animals
                 // can and should eat them. Without this exception, corpses are never
@@ -160,7 +164,7 @@ namespace AnimalFoodPreference
                 bool isAllowedCorpse = allowCorpse && t is Corpse;
                 if (!isAllowedCorpse &&
                     !(t is Building_NutrientPasteDispenser) &&
-                    t.def.ingestible.preferability <= FoodPreferability.DesperateOnlyForHumanlikes)
+                    t.def.ingestible.preferability <= FoodPreferability.DesperateOnly)
                     return false;
                 return !t.IsNotFresh();
             };
@@ -172,19 +176,51 @@ namespace AnimalFoodPreference
                 ? ThingRequest.ForGroup(ThingRequestGroup.FoodSource)
                 : ThingRequest.ForGroup(ThingRequestGroup.FoodSourceNotPlantOrTree);
 
-            List<Thing> searchSet = getter.Map.listerThings.ThingsMatching(thingRequest);
-
-            // ── Score candidates by FoodOptimality and pick the best ─────
+            // ── Search parameters ────────────────────────────────────────
             AnimalFoodPreferenceSettings settings = AnimalFoodPreferenceSettings.Instance;
             float distMult = settings?.distanceMultiplier ?? 1f;
-            float maxDist = settings?.maxSearchDistance ?? 0;
+            int maxSearch = settings?.maxSearchDistance ?? 0;
 
-            Thing bestThing = FindBestByOptimality(eater, getter, searchSet, animalValidator, distMult, maxDist);
+            // The configured distance cap is a grazing-performance knob: only apply it
+            // when an animal is feeding itself. When a colonist is hauling food to an
+            // animal (taming/feeding), search freely like vanilla so far-away animals
+            // can still be fed.
+            float maxDist = (getter == eater && maxSearch > 0) ? maxSearch : 9999f;
+
+            int maxRegions = GetMaxRegionsToScan(getter, forceScanWholeMap);
+
+            // Mirror vanilla's region-skip optimisation / area restriction handling.
+            bool ignoreForbiddenRegions = !allowForbidden &&
+                ForbidUtility.CaresAboutForbidden(getter, cellTarget: true) &&
+                getter.playerSettings?.EffectiveAreaRestrictionInPawnCurrentMap != null;
+
+            // ── Fast path: top-tier food in the animal's current region ──
+            // Very common (e.g. grazers standing in a grassy pen): if the most-preferred
+            // tier is already in the animal's own region, take it and skip the full bounded
+            // region scan. Only triggers when the best local candidate is the TOP tier, so
+            // it can never make the animal settle for a worse tier than the full scan would
+            // reach. (It may pick a top-tier item a few cells farther than the global nearest,
+            // which is irrelevant — the animal still eats its most-preferred food.)
+            Thing quickPick = TryGetTopTierFoodInRegion(getter, thingRequest, animalValidator, distMult, maxDist);
+            if (quickPick != null)
+            {
+                foodDef = FoodUtility.GetFinalIngestibleDef(quickPick);
+                __result = quickPick;
+                return false;
+            }
+
+            // ── Bounded region scan, scored by tier (normal pass) ────────
+            Thing bestThing = FindBestFood(
+                getter, thingRequest, animalValidator, distMult, maxDist, maxRegions, ignoreForbiddenRegions);
 
             // ── Desperate fallback (relax extra animal filters) ──────────
+            // Set desperate=true so the base validator also allows not-fresh (rotting,
+            // not dessicated) food, matching vanilla's internal second pass.
             if (bestThing == null)
             {
-                bestThing = FindBestByOptimality(eater, getter, searchSet, foodValidator, distMult, maxDist);
+                desperate = true;
+                bestThing = FindBestFood(
+                    getter, thingRequest, foodValidator, distMult, maxDist, maxRegions, ignoreForbiddenRegions);
             }
 
             if (bestThing != null)
@@ -197,63 +233,119 @@ namespace AnimalFoodPreference
         }
 
         /// <summary>
-        /// Iterates all candidates, scoring each by FoodOptimality (which includes
-        /// our tier offsets via the FoodOptimality_Patch postfix). Returns the
-        /// highest-scoring reachable food that passes the validator.
+        /// Fast path for the very common case of an animal standing in a region that
+        /// already contains its most-preferred food tier (e.g. a grazer in a grassy pen).
         ///
-        /// distanceMultiplier scales how strongly distance penalises a candidate.
-        /// 1.0 matches vanilla weighting. Higher values favour closer food.
+        /// Scans only the getter's current region for the best-scoring valid candidate.
+        /// Returns it ONLY if that candidate is the top preferred tier — i.e. its tier
+        /// offset equals the maximum (BaseOffset, always tierOrder[0]). In that case no
+        /// other region can hold a better tier, so the full bounded scan is unnecessary.
+        /// If the local best is not top tier, returns null so the caller falls through to
+        /// the full bounded scan (a better tier may lie further out).
         ///
-        /// maxSearchDistance (>0) skips candidates beyond that many cells,
-        /// cutting the candidate set and reducing per-search CPU cost.
-        ///
-        /// Equivalent to the private SpawnedFoodSearchInnerScan method that
-        /// vanilla uses for humanlike pawns.
+        /// Things in the getter's own region are reachable by construction, so no extra
+        /// reachability check is needed beyond the validator.
         /// </summary>
-        private static Thing FindBestByOptimality(
-            Pawn eater, Pawn getter, List<Thing> searchSet, Predicate<Thing> validator,
-            float distanceMultiplier, float maxSearchDistance)
+        private static Thing TryGetTopTierFoodInRegion(
+            Pawn getter, ThingRequest req, Predicate<Thing> validator, float distanceMultiplier, float maxDistance)
         {
-            if (searchSet == null)
+            Region region = getter.Position.GetRegion(getter.Map);
+            if (region == null)
                 return null;
 
-            Thing result = null;
-            float bestScore = float.MinValue;
+            IntVec3 root = getter.Position;
+            List<Thing> things = region.ListerThings.ThingsMatching(req);
+            Thing best = null;
+            float bestPrio = float.MinValue;
+            float bestOffset = float.MinValue;
 
-            for (int i = 0; i < searchSet.Count; i++)
+            for (int i = 0; i < things.Count; i++)
             {
-                Thing thing = searchSet[i];
-                if (!thing.Spawned)
+                Thing t = things[i];
+                if (!t.Spawned)
                     continue;
-
-                float dist = (getter.Position - thing.Position).LengthManhattan;
-
-                // Skip candidates beyond the configured search radius
-                if (maxSearchDistance > 0 && dist > maxSearchDistance)
+                float dist = (root - t.Position).LengthManhattan;
+                if (dist > maxDistance)
                     continue;
-
-                ThingDef thingFoodDef = FoodUtility.GetFinalIngestibleDef(thing);
-                // Pass scaled distance so FoodOptimality applies our distance weight.
-                // Vanilla formula: score -= dist. With multiplier: score -= dist * multiplier.
-                float score = FoodUtility.FoodOptimality(eater, thing, thingFoodDef, dist * distanceMultiplier);
-
-                if (score <= bestScore)
+                float offset = AnimalFoodPreferenceSettings.GetScoreOffset(
+                    FoodClassifier.Classify(FoodUtility.GetFinalIngestibleDef(t)));
+                float prio = offset - dist * distanceMultiplier;
+                if (prio <= bestPrio)
                     continue;
-
-                // Expensive checks only for potential winners
-                if (!getter.Map.reachability.CanReach(
-                    getter.Position, thing, PathEndMode.OnCell,
-                    TraverseParms.For(getter)))
+                if (validator != null && !validator(t))
                     continue;
-
-                if (validator != null && !validator(thing))
-                    continue;
-
-                result = thing;
-                bestScore = score;
+                best = t;
+                bestPrio = prio;
+                bestOffset = offset;
             }
 
-            return result;
+            if (best == null)
+                return null;
+
+            // Only short-circuit when the local winner is the top preferred tier.
+            // bestOffset was captured during the scan, so no re-classification is needed.
+            if (bestOffset >= AnimalFoodPreferenceSettings.BaseOffset)
+                return best;
+            return null;
+        }
+
+        /// <summary>
+        /// Finds the highest-tier reachable food using vanilla's bounded region BFS.
+        ///
+        /// Reuses GenClosest.RegionwiseBFSWorker (public, pooled, zero-alloc) with a
+        /// cheap priority function: <c>tierOffset(category) − dist × distanceMultiplier</c>.
+        /// The BFS picks the highest-priority reachable candidate (nearest as a tie-break),
+        /// honouring per-thing region-local reachability, the distance cap, and the region
+        /// cap. minRegions is set equal to maxRegions so the scan does NOT early-terminate
+        /// on the first valid candidate — it must examine the whole bounded neighbourhood to
+        /// respect the tier ordering (vanilla stops at the nearest, which we explicitly do not want).
+        ///
+        /// Replaces the old whole-map iteration that called FoodUtility.FoodOptimality on
+        /// every candidate (the dominant large-herd cost).
+        /// </summary>
+        private static Thing FindBestFood(
+            Pawn getter, ThingRequest req, Predicate<Thing> validator,
+            float distanceMultiplier, float maxDistance, int maxRegions, bool ignoreForbiddenRegions)
+        {
+            IntVec3 root = getter.Position;
+            Map map = getter.Map;
+
+            Func<Thing, float> priorityGetter = delegate(Thing t)
+            {
+                ThingDef fd = FoodUtility.GetFinalIngestibleDef(t);
+                float dist = (root - t.Position).LengthManhattan;
+                return AnimalFoodPreferenceSettings.GetScoreOffset(FoodClassifier.Classify(fd))
+                       - dist * distanceMultiplier;
+            };
+
+            return GenClosest.RegionwiseBFSWorker(
+                root, map, req, PathEndMode.OnCell, TraverseParms.For(getter),
+                validator, priorityGetter,
+                minRegions: maxRegions, maxRegions: maxRegions, maxDistance: maxDistance,
+                regionsSeen: out _,
+                traversableRegionTypes: RegionType.Set_Passable,
+                ignoreEntirelyForbiddenRegions: ignoreForbiddenRegions);
+        }
+
+        /// <summary>
+        /// Replica of FoodUtility.GetMaxRegionsToScan (private) for the player-animal case.
+        /// A humanlike getter (hauling food to an animal) or forceScanWholeMap searches
+        /// without a region bound; a roaming penned animal is bounded to its pen; otherwise
+        /// the bound is 100 regions — independent of map size.
+        /// </summary>
+        private static int GetMaxRegionsToScan(Pawn getter, bool forceScanWholeMap)
+        {
+            if (getter.RaceProps.Humanlike || forceScanWholeMap)
+                return 999999;
+
+            if (getter.Roamer && AnimalPenUtility.GetFixedAnimalFilter().Allows(getter))
+            {
+                CompAnimalPenMarker pen = AnimalPenUtility.GetCurrentPenOf(getter, allowUnenclosedPens: false);
+                if (pen != null)
+                    return Math.Min(pen.PenState.ConnectedRegions.Count, 100);
+            }
+
+            return 100;
         }
 
         /// <summary>
