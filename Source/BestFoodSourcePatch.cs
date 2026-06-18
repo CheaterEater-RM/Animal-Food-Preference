@@ -179,13 +179,6 @@ namespace AnimalFoodPreference
             // ── Search parameters ────────────────────────────────────────
             AnimalFoodPreferenceSettings settings = AnimalFoodPreferenceSettings.Instance;
             float distMult = settings?.distanceMultiplier ?? 1f;
-            int maxSearch = settings?.maxSearchDistance ?? 0;
-
-            // The configured distance cap is a grazing-performance knob: only apply it
-            // when an animal is feeding itself. When a colonist is hauling food to an
-            // animal (taming/feeding), search freely like vanilla so far-away animals
-            // can still be fed.
-            float maxDist = (getter == eater && maxSearch > 0) ? maxSearch : 9999f;
 
             int maxRegions = GetMaxRegionsToScan(getter, forceScanWholeMap);
 
@@ -201,7 +194,7 @@ namespace AnimalFoodPreference
             // it can never make the animal settle for a worse tier than the full scan would
             // reach. (It may pick a top-tier item a few cells farther than the global nearest,
             // which is irrelevant — the animal still eats its most-preferred food.)
-            Thing quickPick = TryGetTopTierFoodInRegion(getter, thingRequest, animalValidator, distMult, maxDist);
+            Thing quickPick = TryGetTopTierFoodInRegion(getter, thingRequest, animalValidator, distMult);
             if (quickPick != null)
             {
                 foodDef = FoodUtility.GetFinalIngestibleDef(quickPick);
@@ -211,7 +204,7 @@ namespace AnimalFoodPreference
 
             // ── Bounded region scan, scored by tier (normal pass) ────────
             Thing bestThing = FindBestFood(
-                getter, thingRequest, animalValidator, distMult, maxDist, maxRegions, ignoreForbiddenRegions);
+                getter, thingRequest, animalValidator, distMult, maxRegions, ignoreForbiddenRegions);
 
             // ── Desperate fallback (relax extra animal filters) ──────────
             // Set desperate=true so the base validator also allows not-fresh (rotting,
@@ -220,7 +213,7 @@ namespace AnimalFoodPreference
             {
                 desperate = true;
                 bestThing = FindBestFood(
-                    getter, thingRequest, foodValidator, distMult, maxDist, maxRegions, ignoreForbiddenRegions);
+                    getter, thingRequest, foodValidator, distMult, maxRegions, ignoreForbiddenRegions);
             }
 
             if (bestThing != null)
@@ -247,7 +240,7 @@ namespace AnimalFoodPreference
         /// reachability check is needed beyond the validator.
         /// </summary>
         private static Thing TryGetTopTierFoodInRegion(
-            Pawn getter, ThingRequest req, Predicate<Thing> validator, float distanceMultiplier, float maxDistance)
+            Pawn getter, ThingRequest req, Predicate<Thing> validator, float distanceMultiplier)
         {
             Region region = getter.Position.GetRegion(getter.Map);
             if (region == null)
@@ -265,8 +258,6 @@ namespace AnimalFoodPreference
                 if (!t.Spawned)
                     continue;
                 float dist = (root - t.Position).LengthManhattan;
-                if (dist > maxDistance)
-                    continue;
                 float offset = AnimalFoodPreferenceSettings.GetScoreOffset(
                     FoodClassifier.Classify(FoodUtility.GetFinalIngestibleDef(t)));
                 float prio = offset - dist * distanceMultiplier;
@@ -295,8 +286,8 @@ namespace AnimalFoodPreference
         /// Reuses GenClosest.RegionwiseBFSWorker (public, pooled, zero-alloc) with a
         /// cheap priority function: <c>tierOffset(category) − dist × distanceMultiplier</c>.
         /// The BFS picks the highest-priority reachable candidate (nearest as a tie-break),
-        /// honouring per-thing region-local reachability, the distance cap, and the region
-        /// cap. minRegions is set equal to maxRegions so the scan does NOT early-terminate
+        /// honouring per-thing region-local reachability and the region cap (≈100 regions,
+        /// independent of map size). minRegions is set equal to maxRegions so the scan does NOT early-terminate
         /// on the first valid candidate — it must examine the whole bounded neighbourhood to
         /// respect the tier ordering (vanilla stops at the nearest, which we explicitly do not want).
         ///
@@ -305,7 +296,7 @@ namespace AnimalFoodPreference
         /// </summary>
         private static Thing FindBestFood(
             Pawn getter, ThingRequest req, Predicate<Thing> validator,
-            float distanceMultiplier, float maxDistance, int maxRegions, bool ignoreForbiddenRegions)
+            float distanceMultiplier, int maxRegions, bool ignoreForbiddenRegions)
         {
             IntVec3 root = getter.Position;
             Map map = getter.Map;
@@ -321,7 +312,8 @@ namespace AnimalFoodPreference
             return GenClosest.RegionwiseBFSWorker(
                 root, map, req, PathEndMode.OnCell, TraverseParms.For(getter),
                 validator, priorityGetter,
-                minRegions: maxRegions, maxRegions: maxRegions, maxDistance: maxDistance,
+                // 9999f is vanilla's unbounded default; the region cap is the real spatial bound.
+                minRegions: maxRegions, maxRegions: maxRegions, maxDistance: 9999f,
                 regionsSeen: out _,
                 traversableRegionTypes: RegionType.Set_Passable,
                 ignoreEntirelyForbiddenRegions: ignoreForbiddenRegions);

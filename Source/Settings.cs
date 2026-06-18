@@ -48,14 +48,6 @@ namespace AnimalFoodPreference
         /// </summary>
         public float distanceMultiplier = 1f;
 
-        /// <summary>
-        /// Optional extra cap (in cells, Manhattan) on how far a tame animal will look
-        /// for food. The search is ALWAYS bounded to ~100 nearby regions (vanilla-style),
-        /// so it never scans the whole map; this value only tightens that further.
-        /// 0 = no extra distance cap (region-bounded only). Default: 0.
-        /// </summary>
-        public int maxSearchDistance = 0;
-
         // ── Constants ────────────────────────────────────────────────
 
         /// <summary>
@@ -83,7 +75,6 @@ namespace AnimalFoodPreference
         {
             FoodCategory.WildPlant,
             FoodCategory.FlowerOrDecor,
-            FoodCategory.FoodCrop,
             FoodCategory.Corpse,
             FoodCategory.Hay,
             FoodCategory.Kibble,
@@ -95,6 +86,9 @@ namespace AnimalFoodPreference
             FoodCategory.Pemmican,
             FoodCategory.InsectJelly,
             FoodCategory.SurvivalMeal,
+            // Food crops default near the bottom: players generally don't want animals
+            // grazing their standing crops. Kept just above Other (the unknown-food catch-all).
+            FoodCategory.FoodCrop,
             FoodCategory.Other,
         };
 
@@ -111,7 +105,6 @@ namespace AnimalFoodPreference
             defOverrides.Clear();
             tierSpacing = 100f;
             distanceMultiplier = 1f;
-            maxSearchDistance = 0;
             RebuildScores();
             FoodClassifier.ClearCache();
         }
@@ -121,7 +114,6 @@ namespace AnimalFoodPreference
             base.ExposeData();
             Scribe_Values.Look(ref tierSpacing, "tierSpacing", 100f);
             Scribe_Values.Look(ref distanceMultiplier, "distanceMultiplier", 1f);
-            Scribe_Values.Look(ref maxSearchDistance, "maxSearchDistance", 0);
 
             // Serialize tier order as list of strings (enum names for readability)
             List<string> tierNames = tierOrder?.Select(c => c.ToString()).ToList();
