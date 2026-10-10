@@ -30,8 +30,15 @@
     <FileVersion>1.0.0.0</FileVersion>
     <Description>Guides animal food selection to prefer renewable sources first</Description>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <OutputPath>..\1.6\Assemblies\</OutputPath>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release</Configurations>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <!-- ================================================================ -->
