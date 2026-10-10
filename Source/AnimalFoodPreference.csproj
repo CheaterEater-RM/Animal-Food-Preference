@@ -15,7 +15,7 @@
   <!-- ================================================================ -->
   <!-- Import machine-specific game paths (lives outside this repo)     -->
   <!-- ================================================================ -->
-  <Import Project="..\..\RimWorld.Paths.props" />
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('RimWorld.Paths.props', '$(MSBuildProjectDirectory)'))" />
 
   <!-- ================================================================ -->
   <!-- Project configuration                                            -->
