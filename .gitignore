@@ -58,10 +58,6 @@ Player.log
 .claude/
 
 # .github / normally just copilot instructions, not used much anymore.
-.github/
 
 # Agent instruction files
-CLAUDE.md
-AGENTS.md
 # Template-standard generated/local files
-docs/
