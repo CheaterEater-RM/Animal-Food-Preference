@@ -63,4 +63,5 @@ Player.log
 # Agent instruction files
 CLAUDE.md
 AGENTS.md
-
+# Template-standard generated/local files
+docs/
