@@ -1,3 +1,3 @@
 category: major
 
-Updated Animal Food Preference to work with RimWorld 1.7.
+Updated Animal Food Preference for 1.7.
