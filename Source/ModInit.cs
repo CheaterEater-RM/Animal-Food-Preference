@@ -1,3 +1,4 @@
+using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 using Verse;
@@ -33,7 +34,7 @@ namespace AnimalFoodPreference
         static AnimalFoodPreference_Init()
         {
             var harmony = new Harmony("com.cheatereater.animalfoodpreference");
-            harmony.PatchAll();
+            harmony.PatchAll(Assembly.GetExecutingAssembly());
             Log.Message("[Animal Food Preference] Harmony patches applied.");
         }
     }
