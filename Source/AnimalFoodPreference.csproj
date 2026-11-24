@@ -21,7 +21,7 @@
   <!-- Project configuration                                            -->
   <!-- ================================================================ -->
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Library</OutputType>
     <RootNamespace>AnimalFoodPreference</RootNamespace>
     <AssemblyName>AnimalFoodPreference</AssemblyName>
@@ -31,7 +31,9 @@
     <Description>Guides animal food selection to prefer renewable sources first</Description>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <OutputPath>..\1.6\Assemblies\</OutputPath>
+    <OutputPath>..\1.7\Assemblies\</OutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <Platforms>AnyCPU</Platforms>
     <Configurations>Debug;Release</Configurations>
@@ -46,11 +48,11 @@
   <!-- ================================================================ -->
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(RimWorldManaged)\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(RimWorldDir)\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(RimWorldManaged)\UnityEngine.CoreModule.dll</HintPath>
+    <Reference Include="UnityStubs">
+      <HintPath>$(RimWorldDir)\UnityStubs.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
@@ -69,14 +71,6 @@
   <!-- UNITY MODULES — settings UI needs IMGUI + TextRendering          -->
   <!-- ================================================================ -->
   <ItemGroup>
-    <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>$(RimWorldManaged)\UnityEngine.IMGUIModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>$(RimWorldManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
   </ItemGroup>
 
 </Project>
