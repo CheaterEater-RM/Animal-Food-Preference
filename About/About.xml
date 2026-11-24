@@ -8,7 +8,7 @@
     <li>1.7</li>
   </supportedVersions>
   <description>Guides animal food selection to prioritize renewable and cheap food sources first, preserving your valuable meals, pemmican, and survival rations.</description>
-  <modVersion>1.31</modVersion>
+  <modVersion>1.32</modVersion>
   <!-- Harmony dependency -->
   <modDependencies>
     <li>
